@@ -1,0 +1,12 @@
+streamlit
+torch
+numpy
+psutil
+requests
+beautifulsoup4
+lxml
+charset-normalizer
+py7zr
+pymupdf
+ebooklib
+python-docx

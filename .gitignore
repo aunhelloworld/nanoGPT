@@ -1,3 +1,20 @@
+# User data (generated at runtime — do not commit)
+data/*.txt
+data/registry.json
+data/training.pid
+data/_tmp*
+data/temp_*/
+data/my_ai/
+
+# Keep the data folder in git
+!data/.gitkeep
+
+# Training outputs
+out-*/
+out-my_ai/
+*.log
+
+# Existing ignores
 .DS_Store
 .idea
 .ipynb_checkpoints/

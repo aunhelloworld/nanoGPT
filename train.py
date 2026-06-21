@@ -193,7 +193,8 @@ if block_size < model.config.block_size:
 model.to(device)
 
 # initialize a GradScaler. If enabled=False scaler is a no-op
-scaler = torch.cuda.amp.GradScaler(enabled=(dtype == 'float16'))
+# Use torch.amp.GradScaler (torch.cuda.amp.GradScaler is deprecated)
+scaler = torch.amp.GradScaler('cuda', enabled=(dtype == 'float16'))
 
 # optimizer
 optimizer = model.configure_optimizers(weight_decay, learning_rate, (beta1, beta2), device_type)
@@ -263,6 +264,11 @@ while True:
     if iter_num % eval_interval == 0 and master_process:
         losses = estimate_loss()
         print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+        
+        # Log validation loss for the dashboard
+        with open(os.path.join(out_dir, "loss.txt"), "a") as lf:
+            lf.write(f"{iter_num}_val,{losses['val']:.4f}\n")
+        
         if wandb_log:
             wandb.log({
                 "iter": iter_num,
@@ -321,6 +327,11 @@ while True:
         # get loss as float. note: this is a CPU-GPU sync point
         # scale up to undo the division above, approximating the true total loss (exact would have been a sum)
         lossf = loss.item() * gradient_accumulation_steps
+        
+        # Log training loss for the dashboard
+        with open(os.path.join(out_dir, "loss.txt"), "a") as lf:
+            lf.write(f"{iter_num},{lossf:.4f}\n")
+            
         if local_iter_num >= 5: # let the training loop settle a bit
             mfu = raw_model.estimate_mfu(batch_size * gradient_accumulation_steps, dt)
             running_mfu = mfu if running_mfu == -1.0 else 0.9*running_mfu + 0.1*mfu
