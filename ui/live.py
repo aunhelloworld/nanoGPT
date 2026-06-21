@@ -38,9 +38,14 @@ def render_status_bar():
     latest = training.get_latest_train_iter()
     best = training.get_best_val_loss()
     best_s = f"{best:.4f}" if best is not None else "—"
+    prog = training.get_progress_info()
+    pct = prog["percent"]
+    eta = prog["eta"]
     st.markdown(
         f'<div class="live-bar">🔄 {t("sidebar.training", lang)} &nbsp;·&nbsp; '
-        f'{t("analysis.latest_iter", lang)}: <b>{latest}</b> &nbsp;·&nbsp; '
+        f'{pct}% &nbsp;·&nbsp; '
+        f'{t("analysis.latest_iter", lang)}: <b>{latest}</b> / {prog["max_iters"]} &nbsp;·&nbsp; '
+        f'{t("analysis.eta", lang)}: <b>{eta}</b> &nbsp;·&nbsp; '
         f'{t("analysis.best_val", lang)}: <b>{best_s}</b></div>',
         unsafe_allow_html=True,
     )

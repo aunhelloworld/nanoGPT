@@ -101,6 +101,9 @@ def build_train_command(config):
     warmup = max(1, min(100, max_iters - 1))
     device = config.get("device", default_device())
     compile_flag = config.get("compile", device != "cpu")
+    eval_iters = config.get("eval_iters")
+    if eval_iters is None:
+        eval_iters = 25 if device == "cpu" else 200
 
     cmd = [
         sys.executable, "train.py",
@@ -119,7 +122,7 @@ def build_train_command(config):
         f"--min_lr={config.get('min_lr', 1e-4)}",
         f"--warmup_iters={warmup}",
         "--eval_interval=250",
-        "--eval_iters=200",
+        f"--eval_iters={eval_iters}",
         "--log_interval=10",
         "--beta2=0.99",
         "--always_save_checkpoint=False",
@@ -208,6 +211,61 @@ def get_latest_train_iter():
     return train[-1]["iter"]
 
 
+def get_training_target_iters() -> int | None:
+    """Max iterations for the active training run."""
+    import streamlit as st
+    if st.session_state.get("train_max_iters"):
+        return st.session_state.train_max_iters
+    run_id = st.session_state.get("train_run_id")
+    if run_id:
+        from lib.registry import get_run
+        run = get_run(run_id)
+        if run:
+            return run.get("iters")
+    from lib.registry import get_active_run
+    active = get_active_run()
+    if active:
+        return active.get("iters")
+    return None
+
+
+def format_eta(seconds: float | None) -> str:
+    if seconds is None or seconds < 0 or seconds != seconds:
+        return "—"
+    seconds = int(seconds)
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes, secs = divmod(seconds, 60)
+    if minutes < 60:
+        return f"{minutes}m {secs}s"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes}m"
+
+
+def get_progress_info() -> dict:
+    """Progress fraction and ETA while training."""
+    import time
+    import streamlit as st
+
+    max_iters = get_training_target_iters() or 0
+    latest = get_latest_train_iter()
+    fraction = min(latest / max_iters, 1.0) if max_iters > 0 else 0.0
+
+    eta_seconds = None
+    start = st.session_state.get("train_start_time")
+    if start and latest > 0 and max_iters > latest:
+        elapsed = time.time() - start
+        eta_seconds = (max_iters - latest) * (elapsed / latest)
+
+    return {
+        "latest": latest,
+        "max_iters": max_iters,
+        "fraction": fraction,
+        "eta": format_eta(eta_seconds),
+        "percent": int(fraction * 100),
+    }
+
+
 def check_training_finished(proc):
     if proc is None:
         return True, None
@@ -220,22 +278,5 @@ def check_training_finished(proc):
 
 
 def reset_all():
-    kill_train_process()
-    import shutil
-    for path in [OUT_DIR, DATASET_DIR]:
-        if os.path.exists(path):
-            shutil.rmtree(path)
-    if os.path.exists("data"):
-        for f in os.listdir("data"):
-            if f.endswith(".txt") or f.startswith("_tmp") or f == "training.pid":
-                fp = os.path.join("data", f)
-                if os.path.isfile(fp):
-                    os.remove(fp)
-                elif os.path.isdir(fp):
-                    shutil.rmtree(fp, ignore_errors=True)
-        for d in ["temp_extract", "temp_convert"]:
-            dp = os.path.join("data", d)
-            if os.path.exists(dp):
-                shutil.rmtree(dp, ignore_errors=True)
-    from lib.registry import reset_registry
-    reset_registry()
+    from lib.cleanup import delete_everything
+    delete_everything()

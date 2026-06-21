@@ -1,9 +1,11 @@
 """Sidebar controls."""
 
+import os
+
 import streamlit as st
 
 from language import available_languages, language_label, t
-from lib import registry, training
+from lib import model_io, registry, training
 from ui.state import get_lang
 from ui.training_state import is_training_live
 from ui.workflow import get_workflow_state
@@ -57,30 +59,77 @@ def render_sidebar():
                     registry.finish_run(st.session_state.train_run_id, status="stopped")
                     st.session_state.train_run_id = None
                     st.session_state.train_proc = None
+                    st.session_state.train_start_time = None
+                    st.session_state.train_max_iters = None
                 st.rerun()
 
-            st.divider()
-            if st.button(f"🗑️ {t('sidebar.reset_all', lang)}", use_container_width=True):
-                st.session_state.show_reset_confirm = True
+        st.divider()
+        st.caption(t("sidebar.danger_zone", lang))
 
-            if st.session_state.show_reset_confirm:
-                st.error(t("sidebar.reset_warning", lang))
-                confirm = st.text_input(t("sidebar.reset_confirm", lang))
-                c1, c2 = st.columns(2)
-                if c1.button(t("sidebar.reset_confirm_btn", lang), type="primary"):
-                    if confirm == "RESET":
-                        training.reset_all()
-                        st.session_state.msgs = []
-                        st.session_state.train_run_id = None
-                        st.session_state.train_proc = None
-                        st.session_state.show_reset_confirm = False
-                        st.cache_resource.clear()
-                        st.rerun()
-                    else:
-                        st.error(t("sidebar.reset_type_error", lang))
-                if c2.button(t("sidebar.reset_cancel", lang)):
+        has_anything = (
+            state != "empty"
+            or training.has_checkpoint()
+            or registry.list_txt_files()
+            or os.path.exists("data/registry.json")
+        )
+
+        if st.button(
+            f"🗑️ {t('sidebar.reset_all', lang)}",
+            use_container_width=True,
+            disabled=not has_anything,
+            help=t("sidebar.reset_hint", lang),
+        ):
+            st.session_state.show_reset_confirm = True
+
+        if st.session_state.show_reset_confirm:
+            st.error(t("sidebar.reset_warning", lang))
+            st.markdown(t("sidebar.reset_deletes", lang))
+            st.caption(t("sidebar.backup_before_reset", lang))
+            bc1, bc2 = st.columns(2)
+            with bc1:
+                if model_io.can_export():
+                    st.download_button(
+                        t("manage.export_model", lang),
+                        model_io.export_model_zip(),
+                        file_name=model_io.ZIP_NAME,
+                        mime="application/zip",
+                        use_container_width=True,
+                        key="sidebar_backup_model",
+                    )
+            with bc2:
+                if os.path.exists("data/registry.json"):
+                    st.download_button(
+                        t("manage.export_registry", lang),
+                        registry.export_registry_json(),
+                        file_name="registry.json",
+                        mime="application/json",
+                        use_container_width=True,
+                        key="sidebar_backup_registry",
+                    )
+            confirm = st.text_input(t("sidebar.reset_confirm", lang))
+            c1, c2 = st.columns(2)
+            if c1.button(t("sidebar.reset_confirm_btn", lang), type="primary"):
+                if confirm == "RESET":
+                    training.reset_all()
+                    st.session_state.msgs = []
+                    st.session_state.train_run_id = None
+                    st.session_state.train_proc = None
+                    st.session_state.train_start_time = None
+                    st.session_state.train_max_iters = None
                     st.session_state.show_reset_confirm = False
+                    st.session_state.nav = "guide"
+                    st.cache_resource.clear()
                     st.rerun()
+                else:
+                    st.error(t("sidebar.reset_type_error", lang))
+            if c2.button(t("sidebar.reset_cancel", lang)):
+                st.session_state.show_reset_confirm = False
+                st.rerun()
+
+        if not has_anything:
+            st.caption(t("sidebar.reset_nothing", lang))
+        else:
+            st.caption(t("sidebar.manage_hint", lang))
 
         st.divider()
         st.caption(f"{t('sidebar.device', lang)}: `{training.default_device()}`")

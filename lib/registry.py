@@ -60,7 +60,7 @@ def increment_train_count(filenames):
     save_registry(registry)
 
 
-def start_run(*, iters, init_from, files_used, config):
+def start_run(*, iters, init_from, files_used, config, preset=None, auto_meta=None):
     registry = load_registry()
     run_id = len(registry["runs"]) + 1
     run = {
@@ -72,11 +72,20 @@ def start_run(*, iters, init_from, files_used, config):
         "files_used": files_used,
         "final_val_loss": None,
         "config": config,
+        "preset": preset,
+        "auto_meta": auto_meta,
         "status": "running",
     }
     registry["runs"].append(run)
     save_registry(registry)
     return run_id
+
+
+def get_run(run_id):
+    for run in load_registry().get("runs", []):
+        if run["id"] == run_id:
+            return run
+    return None
 
 
 def finish_run(run_id, *, final_val_loss=None, status="completed"):
