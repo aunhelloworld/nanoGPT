@@ -1,4 +1,5 @@
-streamlit
+streamlit>=1.37
+streamlit-autorefresh>=1.0.1
 torch
 numpy
 psutil

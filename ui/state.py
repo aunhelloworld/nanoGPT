@@ -4,6 +4,8 @@ import streamlit as st
 
 from language import DEFAULT_LANG
 
+NAV_PAGES = ("guide", "import", "data", "train", "analysis", "chat", "tools")
+
 
 def init_session_state():
     defaults = {
@@ -12,6 +14,7 @@ def init_session_state():
         "train_proc": None,
         "show_reset_confirm": False,
         "lang": DEFAULT_LANG,
+        "nav": "guide",
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -20,3 +23,7 @@ def init_session_state():
 
 def get_lang() -> str:
     return st.session_state.get("lang", DEFAULT_LANG)
+
+
+def get_nav() -> str:
+    return st.session_state.get("nav", "guide")
